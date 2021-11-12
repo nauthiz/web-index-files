@@ -32,6 +32,7 @@ type WebIndexClient struct {
 
 type DownloadOptions struct {
 	Recursive bool
+	IgnoreError bool
 }
 
 type DownloadOption interface {
@@ -58,6 +59,16 @@ func (o RecursiveOption) ApplyPrintOption(options *PrintOptions) {
 
 func WithRecursive(recursive bool) RecursiveOption {
 	return RecursiveOption(recursive)
+}
+
+type IgnoreErrorOption bool
+
+func (o IgnoreErrorOption) ApplyDownloadOption(options *DownloadOptions) {
+	options.IgnoreError = bool(o)
+}
+
+func WithIgnoreError(ignoreError bool) IgnoreErrorOption {
+	return IgnoreErrorOption(ignoreError)
 }
 
 func (c *WebIndexClient) NewRequest(method string, url string, body io.Reader) (request *http.Request, err error) {
@@ -157,7 +168,7 @@ func (c *WebIndexClient) DownloadEntries(url string, outputPath string, options 
 		option.ApplyDownloadOption(appliedOptions)
 	}
 
-	downloader := &entryDownloader{Client: c, BaseUrl: url, OutputDirectoryPath: outputPath, Recursive: appliedOptions.Recursive}
+	downloader := &entryDownloader{Client: c, BaseUrl: url, OutputDirectoryPath: outputPath, Recursive: appliedOptions.Recursive, IgnoreError: appliedOptions.IgnoreError}
 	return c.WalkEntries(url, downloader.downloadEntry)
 }
 
@@ -183,7 +194,7 @@ func (c *WebIndexClient) DownloadEntry(url string, outputPath string) (err error
 	}()
 
 	if response.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", response.StatusCode, response.Status)
+		return fmt.Errorf("status code error: %d %s", response.StatusCode, response.Status)
 	}
 
 	bytes, err := ioutil.ReadAll(response.Body)
@@ -210,6 +221,7 @@ type entryDownloader struct {
 	BaseUrl             string
 	OutputDirectoryPath string
 	Recursive           bool
+	IgnoreError         bool
 }
 
 func (d *entryDownloader) downloadEntry(baseUrl string, entryType EntryType, entryPath string) (err error) {
@@ -244,7 +256,14 @@ func (d *entryDownloader) downloadEntry(baseUrl string, entryType EntryType, ent
 		return d.Client.WalkEntries(baseUrl+"/"+entryPath, d.downloadEntry)
 	} else if entryType == EntryTypeFile {
 		fmt.Printf("Downloading File ...   %v\n", path.Join(directoryPath, entryPath))
-		return d.Client.DownloadEntry(baseUrl+"/"+entryPath, outputEntryPath)
+		err = d.Client.DownloadEntry(baseUrl+"/"+entryPath, outputEntryPath)
+
+		if err != nil && d.IgnoreError {
+			fmt.Printf("Failed to download ... %s\n", err)
+			err = nil
+		}
+
+		return
 	} else {
 		return fmt.Errorf("\"%v\" unsupported entry type ", entryType)
 	}

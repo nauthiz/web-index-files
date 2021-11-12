@@ -15,7 +15,8 @@ var httpFlags struct {
 
 var downloadFlags struct {
 	OutputDir string
-	Recursive bool
+	Recursive   bool
+	IgnoreError bool
 }
 
 var listFlags struct {
@@ -76,7 +77,7 @@ var downloadCommand = &cobra.Command{
 			return
 		}
 
-		return client.DownloadEntries(url, downloadFlags.OutputDir, WithRecursive(downloadFlags.Recursive))
+		return client.DownloadEntries(url, downloadFlags.OutputDir, WithRecursive(downloadFlags.Recursive), WithIgnoreError(downloadFlags.IgnoreError))
 	},
 }
 
@@ -88,6 +89,7 @@ func init() {
 	downloadCommand.Flags().StringVarP(&httpFlags.Credential, "auth", "a", "", "Specify user and password of basic authentication")
 	downloadCommand.Flags().StringVarP(&downloadFlags.OutputDir, "output-dir", "o", "", "Specify output directory")
 	downloadCommand.Flags().BoolVarP(&downloadFlags.Recursive, "recursive", "r", false, "Download entries recursively")
+	downloadCommand.Flags().BoolVar(&downloadFlags.IgnoreError, "ignore-error", false, "Ignore download error")
 	rootCommand.AddCommand(downloadCommand)
 }
 
