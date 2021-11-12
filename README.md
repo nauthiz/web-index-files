@@ -13,6 +13,12 @@ Webサーバが返すインデックスページを読み込み、含まれて�
 $ web-index-files list https://path/to/index
 ```
 
+指定したURLに含まれるファイル、ディレクトリを再帰的に一覧表示。
+
+```
+$ web-index-files list https://path/to/index -r
+```
+
 指定したURLに含まれるファイル、ディレクトリをoutputディレクトリに保存。
 
 ```

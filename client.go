@@ -30,6 +30,36 @@ type WebIndexClient struct {
 	credential *Credential
 }
 
+type DownloadOptions struct {
+	Recursive bool
+}
+
+type DownloadOption interface {
+	ApplyDownloadOption(options *DownloadOptions)
+}
+
+type PrintOptions struct {
+	Recursive bool
+}
+
+type PrintOption interface {
+	ApplyPrintOption(options *PrintOptions)
+}
+
+type RecursiveOption bool
+
+func (o RecursiveOption) ApplyDownloadOption(options *DownloadOptions) {
+	options.Recursive = bool(o)
+}
+
+func (o RecursiveOption) ApplyPrintOption(options *PrintOptions) {
+	options.Recursive = bool(o)
+}
+
+func WithRecursive(recursive bool) RecursiveOption {
+	return RecursiveOption(recursive)
+}
+
 func (c *WebIndexClient) NewRequest(method string, url string, body io.Reader) (request *http.Request, err error) {
 	request, err = http.NewRequest(method, url, body)
 
@@ -105,13 +135,29 @@ func (c *WebIndexClient) WalkEntries(url string, handler func(baseUrl string, en
 	return handlerErr
 }
 
-func (c *WebIndexClient) PrintEntries(url string) (err error) {
-	printer := &entryPrinter{Client: c, BaseUrl: url}
+func (c *WebIndexClient) PrintEntries(url string, options ...PrintOption) (err error) {
+	appliedOptions := &PrintOptions{
+		Recursive: false,
+	}
+
+	for _, option := range options {
+		option.ApplyPrintOption(appliedOptions)
+	}
+
+	printer := &entryPrinter{Client: c, BaseUrl: url, Recursive: appliedOptions.Recursive}
 	return c.WalkEntries(url, printer.printEntry)
 }
 
-func (c *WebIndexClient) DownloadEntries(url string, outputPath string) (err error) {
-	downloader := &entryDownloader{Client: c, BaseUrl: url, OutputDirectoryPath: outputPath}
+func (c *WebIndexClient) DownloadEntries(url string, outputPath string, options ...DownloadOption) (err error) {
+	appliedOptions := &DownloadOptions{
+		Recursive: false,
+	}
+
+	for _, option := range options {
+		option.ApplyDownloadOption(appliedOptions)
+	}
+
+	downloader := &entryDownloader{Client: c, BaseUrl: url, OutputDirectoryPath: outputPath, Recursive: appliedOptions.Recursive}
 	return c.WalkEntries(url, downloader.downloadEntry)
 }
 
@@ -163,6 +209,7 @@ type entryDownloader struct {
 	Client              *WebIndexClient
 	BaseUrl             string
 	OutputDirectoryPath string
+	Recursive           bool
 }
 
 func (d *entryDownloader) downloadEntry(baseUrl string, entryType EntryType, entryPath string) (err error) {
@@ -182,6 +229,7 @@ func (d *entryDownloader) downloadEntry(baseUrl string, entryType EntryType, ent
 		_, statErr := os.Stat(outputEntryPath)
 
 		if statErr != nil {
+			fmt.Printf("Creating Directory ... %v\n", path.Join(directoryPath, entryPath)+"/")
 			err = os.Mkdir(outputEntryPath, 0777)
 
 			if err != nil {
@@ -189,7 +237,10 @@ func (d *entryDownloader) downloadEntry(baseUrl string, entryType EntryType, ent
 			}
 		}
 
-		fmt.Printf("Creating Directory ... %v\n", path.Join(directoryPath, entryPath)+"/")
+		if !d.Recursive {
+			return
+		}
+
 		return d.Client.WalkEntries(baseUrl+"/"+entryPath, d.downloadEntry)
 	} else if entryType == EntryTypeFile {
 		fmt.Printf("Downloading File ...   %v\n", path.Join(directoryPath, entryPath))
@@ -202,6 +253,7 @@ func (d *entryDownloader) downloadEntry(baseUrl string, entryType EntryType, ent
 type entryPrinter struct {
 	Client  *WebIndexClient
 	BaseUrl string
+	Recursive bool
 }
 
 func (p *entryPrinter) printEntry(baseUrl string, entryType EntryType, entryPath string) (err error) {
@@ -218,17 +270,12 @@ func (p *entryPrinter) printEntry(baseUrl string, entryType EntryType, entryPath
 	fullEntryPath := path.Join(directoryPath, entryPath)
 
 	if entryType == EntryTypeDirectory {
-		_, statErr := os.Stat(fullEntryPath)
+		fmt.Println(fullEntryPath + "/")
 
-		if statErr != nil {
-			err = os.Mkdir(fullEntryPath, 0777)
-
-			if err != nil {
-				return
-			}
+		if !p.Recursive {
+			return
 		}
 
-		fmt.Println(fullEntryPath + "/")
 		return p.Client.WalkEntries(baseUrl+"/"+entryPath, p.printEntry)
 	} else if entryType == EntryTypeFile {
 		fmt.Println(fullEntryPath)

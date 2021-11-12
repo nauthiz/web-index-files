@@ -15,6 +15,11 @@ var httpFlags struct {
 
 var downloadFlags struct {
 	OutputDir string
+	Recursive bool
+}
+
+var listFlags struct {
+	Recursive bool
 }
 
 func parseCredential(value string) (credential *Credential, err error) {
@@ -55,7 +60,7 @@ var listCommand = &cobra.Command{
 			return
 		}
 
-		return client.PrintEntries(url)
+		return client.PrintEntries(url, WithRecursive(listFlags.Recursive))
 	},
 }
 
@@ -71,16 +76,18 @@ var downloadCommand = &cobra.Command{
 			return
 		}
 
-		return client.DownloadEntries(url, downloadFlags.OutputDir)
+		return client.DownloadEntries(url, downloadFlags.OutputDir, WithRecursive(downloadFlags.Recursive))
 	},
 }
 
 func init() {
 	listCommand.Flags().StringVarP(&httpFlags.Credential, "auth", "a", "", "Specify user and password of basic authentication")
+	listCommand.Flags().BoolVarP(&listFlags.Recursive, "recursive", "r", false, "Print entries recursively")
 	rootCommand.AddCommand(listCommand)
 
 	downloadCommand.Flags().StringVarP(&httpFlags.Credential, "auth", "a", "", "Specify user and password of basic authentication")
 	downloadCommand.Flags().StringVarP(&downloadFlags.OutputDir, "output-dir", "o", "", "Specify output directory")
+	downloadCommand.Flags().BoolVarP(&downloadFlags.Recursive, "recursive", "r", false, "Download entries recursively")
 	rootCommand.AddCommand(downloadCommand)
 }
 
