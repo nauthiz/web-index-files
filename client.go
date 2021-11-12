@@ -44,8 +44,8 @@ func (c *WebIndexClient) NewRequest(method string, url string, body io.Reader) (
 	return
 }
 
-func (c *WebIndexClient) WalkEntries(baseUrl string, handler func(baseUrl string, entryType EntryType, entryUrl string) error) (err error) {
-	request, err := c.NewRequest("GET", baseUrl, nil)
+func (c *WebIndexClient) WalkEntries(url string, handler func(baseUrl string, entryType EntryType, entryUrl string) error) (err error) {
+	request, err := c.NewRequest("GET", url, nil)
 
 	if err != nil {
 		return
@@ -96,7 +96,7 @@ func (c *WebIndexClient) WalkEntries(baseUrl string, handler func(baseUrl string
 			entryType = EntryTypeFile
 		}
 
-		if err := handler(baseUrl, entryType, entryPath); err != nil {
+		if err := handler(url, entryType, entryPath); err != nil {
 			handlerErr = err
 			return
 		}
@@ -115,8 +115,8 @@ func (c *WebIndexClient) DownloadEntries(url string, outputPath string) (err err
 	return c.WalkEntries(url, downloader.downloadEntry)
 }
 
-func (c *WebIndexClient) DownloadEntryFile(entryUrl string, outputPath string) (err error) {
-	request, err := c.NewRequest("GET", entryUrl, nil)
+func (c *WebIndexClient) DownloadEntry(url string, outputPath string) (err error) {
+	request, err := c.NewRequest("GET", url, nil)
 
 	if err != nil {
 		return
@@ -193,7 +193,7 @@ func (d *entryDownloader) downloadEntry(baseUrl string, entryType EntryType, ent
 		return d.Client.WalkEntries(baseUrl+"/"+entryPath, d.downloadEntry)
 	} else if entryType == EntryTypeFile {
 		fmt.Printf("Downloading File ...   %v\n", path.Join(directoryPath, entryPath))
-		return d.Client.DownloadEntryFile(baseUrl+"/"+entryPath, outputEntryPath)
+		return d.Client.DownloadEntry(baseUrl+"/"+entryPath, outputEntryPath)
 	} else {
 		return fmt.Errorf("\"%v\" unsupported entry type ", entryType)
 	}
